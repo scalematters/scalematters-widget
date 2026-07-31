@@ -19,7 +19,7 @@
   var row = document.createElement('div');
   row.className = 'sm-ask-row';
   row.innerHTML =
-    '<input class="sm-ask-input" type="text" placeholder="Describe your situation or ask a question...">' +
+    '<input class="sm-ask-input" type="text" placeholder="Tell us about your project or ask a question...">' +
     '<button class="sm-ask-button">Ask →</button>';
 
   if (scriptEl && scriptEl.parentNode) {
