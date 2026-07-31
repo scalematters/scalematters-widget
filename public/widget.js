@@ -33,18 +33,20 @@
   }
 
   function renderMessageHtml(text) {
-    var urlRegex = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]])/g;
+    // Matches either markdown-style [label](url) links or bare URLs — the
+    // model isn't consistent about which form it uses for the booking link.
+    var linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<]+[^\s<.,:;"')\]])/g;
     var html = '';
     var lastIndex = 0;
     var match;
-    while ((match = urlRegex.exec(text))) {
+    while ((match = linkRegex.exec(text))) {
       html += escapeHtml(text.slice(lastIndex, match.index));
-      var url = match[0];
+      var url = match[2] || match[3];
+      lastIndex = match.index + match[0].length;
       html +=
         '<br><a href="' +
         escapeHtml(url) +
         '" target="_blank" rel="noopener noreferrer" class="sm-widget-cta">Book a time →</a>';
-      lastIndex = match.index + url.length;
     }
     html += escapeHtml(text.slice(lastIndex));
     return html;
