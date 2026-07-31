@@ -20,7 +20,10 @@ const SYSTEM_PROMPT = fs.readFileSync(
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
+  redis: new Redis({
+    url: process.env.KV_REST_API_URL,
+    token: process.env.KV_REST_API_TOKEN,
+  }),
   limiter: Ratelimit.slidingWindow(20, '1 m'),
   prefix: 'scalematters-widget',
 });
