@@ -13,7 +13,7 @@ const MAX_TOKENS = 1024;
 // Read once per cold start — this file is large and static, so it's cached
 // for the lifetime of the serverless instance rather than re-read per request.
 const SYSTEM_PROMPT = fs.readFileSync(
-  path.join(process.cwd(), 'knowledge_base.md'),
+  path.join(__dirname, '..', 'knowledge_base.md'),
   'utf-8'
 );
 
