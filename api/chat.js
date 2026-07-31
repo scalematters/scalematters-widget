@@ -3,7 +3,8 @@ const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const { Ratelimit } = require('@upstash/ratelimit');
 const { Redis } = require('@upstash/redis');
-const { upsertConversation } = require('../db/client');
+const { getSlackThreadTs, upsertConversation } = require('../db/client');
+const { postToSlack } = require('../lib/slack');
 
 const MODEL = 'claude-sonnet-4-6';
 const MAX_MESSAGES = 40;
@@ -121,11 +122,36 @@ module.exports = async function handler(req, res) {
   }
 
   const fullTranscript = [...messages, { role: 'assistant', content: reply }];
+  const latestUserMessage = messages[messages.length - 1].content;
+
+  let slackThreadTs = null;
+  try {
+    slackThreadTs = await getSlackThreadTs(session_id);
+  } catch (err) {
+    console.error('Slack thread lookup error', err);
+  }
+
+  const isNewConversation = !slackThreadTs;
+  const slackText = isNewConversation
+    ? `:speech_balloon: *New website chat*\n\n*Visitor:* ${latestUserMessage}\n\n*Assistant:* ${reply}`
+    : `*Visitor:* ${latestUserMessage}\n\n*Assistant:* ${reply}`;
 
   try {
-    await upsertConversation({ sessionId: session_id, messages: fullTranscript, ipAddress: ip });
+    const returnedTs = await postToSlack({ threadTs: slackThreadTs, text: slackText });
+    if (isNewConversation) slackThreadTs = returnedTs;
   } catch (err) {
     // Logging failure shouldn't block the reply from reaching the visitor.
+    console.error('Slack post error', err);
+  }
+
+  try {
+    await upsertConversation({
+      sessionId: session_id,
+      messages: fullTranscript,
+      ipAddress: ip,
+      slackThreadTs,
+    });
+  } catch (err) {
     console.error('Postgres upsert error', err);
   }
 

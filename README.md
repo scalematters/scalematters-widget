@@ -35,9 +35,23 @@ already done.
 ### 4. Add Upstash (rate limiting)
 
 1. Still in the Vercel project, go to the **Storage** tab (or **Integrations**, depending on Vercel's current layout) and find **Upstash** (Redis).
-2. Add it on the free tier and connect it to this project. This sets `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` automatically.
+2. Add it on the free tier and connect it to this project. This sets `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically.
 
-### 5. Set the remaining environment variables
+### 5. Add Slack (conversation notifications)
+
+Every conversation gets posted to a Slack channel — a new message when it starts, with follow-up turns threaded underneath.
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From scratch**. Name it something like "scaleMatters Chat Logger" and pick your workspace.
+2. In the app's settings, go to **OAuth & Permissions** (left sidebar).
+3. Scroll to **Scopes → Bot Token Scopes** → **Add an OAuth Scope** → add `chat:write`.
+4. Scroll up and click **Install to Workspace** (or **Install App**), then approve it.
+5. Copy the **Bot User OAuth Token** — it starts with `xoxb-`. This is a secret, treat it like a password.
+6. In Slack itself, create or pick the channel you want conversations posted to (e.g. `#website-chats`), then type `/invite @YourAppName` in that channel to let the bot post there.
+7. Get the channel's ID: right-click the channel name → **View channel details** → scroll down to find the Channel ID (or it's the last part of the channel's URL).
+8. Add both values in Vercel's environment variables (see step 6 below): `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID`.
+9. Run the migration in [`db/schema.sql`](db/schema.sql) (the `alter table` line at the bottom) against the Postgres database, since the `conversations` table needs a new column to track Slack threads.
+
+### 6. Set the remaining environment variables
 
 In the Vercel project's **Settings → Environment Variables**, add:
 
@@ -45,10 +59,12 @@ In the Vercel project's **Settings → Environment Variables**, add:
 |---|---|
 | `ANTHROPIC_API_KEY` | Your Claude API key from [console.anthropic.com](https://console.anthropic.com) |
 | `ALLOWED_ORIGIN` | `https://www.scalematters.com` (or whatever the live site's exact domain is) |
+| `SLACK_BOT_TOKEN` | The `xoxb-...` token from step 5 above |
+| `SLACK_CHANNEL_ID` | The channel ID from step 5 above |
 
 Redeploy after adding these (Vercel's dashboard has a **Redeploy** button, or it happens automatically on the next git push).
 
-### 6. Get the embed snippet onto the site
+### 7. Get the embed snippet onto the site
 
 Once deployed, Vercel gives the project a domain like `scalematters-widget.vercel.app`
 (or a custom domain if one is set up). The embed snippet is:
@@ -76,7 +92,9 @@ I'll fill in the exact domain for you once the first deploy succeeds — just pa
 
 ## Reviewing conversations
 
-All conversations land in the `conversations` table, keyed by `session_id`, and update live as a visitor chats (not just when they finish). Some useful queries to run from the Vercel Postgres **Query** tab:
+The fastest way is Slack — every conversation posts as a new message in the channel set up in step 5, with follow-up turns threaded underneath as the visitor keeps chatting.
+
+For historical/bulk review, all conversations also land in the `conversations` table, keyed by `session_id`, and update live as a visitor chats (not just when they finish). Some useful queries to run from the Vercel Postgres **Query** tab:
 
 Most recent conversations:
 ```sql
