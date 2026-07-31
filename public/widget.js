@@ -175,4 +175,15 @@
         sendBtn.disabled = false;
       });
   }
+
+  // Public API so other page elements (e.g. a homepage "ask a question" box)
+  // can hand off a question to this same widget instead of building their own.
+  window.ScaleMattersWidget = {
+    ask: function (text) {
+      if (!text) return;
+      setOpen(true);
+      inputEl.value = text;
+      send();
+    },
+  };
 })();
