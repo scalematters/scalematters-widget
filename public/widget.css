@@ -180,7 +180,13 @@
   padding: 9px 11px;
   font-size: 14px;
   font-family: var(--sm-widget-font);
-  max-height: 90px;
+  /* Host pages sometimes style bare <textarea>/<button> elements globally
+     (e.g. contact-form defaults) — pin these explicitly so that bleeds in. */
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: 90px !important;
+  line-height: 1.4 !important;
+  box-sizing: border-box !important;
 }
 
 .sm-widget-input:focus {
@@ -197,6 +203,10 @@
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;
+  height: 38px !important;
+  min-height: 0 !important;
+  align-self: flex-end;
+  flex-shrink: 0;
 }
 
 .sm-widget-send:disabled {
