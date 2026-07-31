@@ -1,6 +1,6 @@
-import { sql } from '@vercel/postgres';
+const { sql } = require('@vercel/postgres');
 
-export async function upsertConversation({ sessionId, messages, ipAddress }) {
+async function upsertConversation({ sessionId, messages, ipAddress }) {
   await sql`
     insert into conversations (session_id, messages, ip_address)
     values (${sessionId}, ${JSON.stringify(messages)}, ${ipAddress})
@@ -11,3 +11,5 @@ export async function upsertConversation({ sessionId, messages, ipAddress }) {
       updated_at = now()
   `;
 }
+
+module.exports = { upsertConversation };
