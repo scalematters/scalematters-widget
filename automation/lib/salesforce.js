@@ -2,10 +2,18 @@
 // Requires a Connected App configured for Client Credentials with a read-only
 // "Run As" integration user — see README for setup steps.
 //
-// The exact field names below (Type, Account.Name) are a reasonable default;
-// scaleMatters' org may use custom fields (e.g. a Category__c picklist) for
-// how Cases get classified. Adjust the SOQL in getRecentClosedCases() to match
-// the org's actual schema once this is wired up against production data.
+// Only pulls cases that are both closed AND have a non-empty Description —
+// a case closed without any notes gives Claude nothing to actually learn
+// from, so it's excluded rather than passed through as a content-free entry.
+//
+// The exact field names below (Type, Account.Name, Description-as-the-
+// resolution-notes-field) are a reasonable default; scaleMatters' org may
+// use custom fields (e.g. a Category__c picklist, or a dedicated
+// Resolution__c field instead of Description) for how Cases get classified
+// and documented. Adjust the SOQL and the field mapping below to match the
+// org's actual schema once this is wired up against production data — in
+// particular, if there's a distinct field for "how this was solved" versus
+// the original Description, that field is a better fit here than Description.
 
 async function getAccessToken() {
   const instanceUrl = process.env.SF_INSTANCE_URL;
@@ -39,6 +47,8 @@ async function getRecentClosedCases({ sinceDays = 7 } = {}) {
     FROM Case
     WHERE IsClosed = true
     AND ClosedDate = LAST_N_DAYS:${sinceDays}
+    AND Description != null
+    AND Description != ''
     ORDER BY ClosedDate DESC
     LIMIT 500
   `.trim();
