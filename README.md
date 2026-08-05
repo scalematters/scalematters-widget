@@ -144,7 +144,7 @@ never commit `.env.local`).
   time →" button whenever the assistant's reply contains a URL — no special
   configuration needed.
 
-## V2: Automated Content Pipeline
+## V2: KB Refresh and Work Journal Automation
 
 A weekly GitHub Action ([`.github/workflows/weekly-content-pipeline.yml`](.github/workflows/weekly-content-pipeline.yml)) pulls the last 7 days of Salesforce Cases (Gong call summaries are already synced into Salesforce, so there's no separate Gong connection) and two Google Drive folders, then:
 
