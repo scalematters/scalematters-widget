@@ -14,6 +14,11 @@
 // org's actual schema once this is wired up against production data — in
 // particular, if there's a distinct field for "how this was solved" versus
 // the original Description, that field is a better fit here than Description.
+//
+// No separate Gong integration — Gong call summaries already sync into
+// Salesforce. Once it's confirmed exactly where that sync writes to (a
+// Case field, an Account field, or related Task/Activity records), extend
+// the SOQL below (or add a related-object subquery) to pull it in here.
 
 async function getAccessToken() {
   const instanceUrl = process.env.SF_INSTANCE_URL;

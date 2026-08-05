@@ -26,14 +26,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Gather inputs (Salesforce, Gong, Drive)
+      - name: Gather inputs (Salesforce, Drive)
         run: node gather-inputs.js
         env:
           SF_CLIENT_ID: ${{ secrets.SF_CLIENT_ID }}
           SF_CLIENT_SECRET: ${{ secrets.SF_CLIENT_SECRET }}
           SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}
-          GONG_ACCESS_KEY: ${{ secrets.GONG_ACCESS_KEY }}
-          GONG_ACCESS_KEY_SECRET: ${{ secrets.GONG_ACCESS_KEY_SECRET }}
           GOOGLE_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 }}
           DRIVE_CUSTOMER_FOLDER_ID: ${{ secrets.DRIVE_CUSTOMER_FOLDER_ID }}
           DRIVE_AGENCY_FOLDER_ID: ${{ secrets.DRIVE_AGENCY_FOLDER_ID }}

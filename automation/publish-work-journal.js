@@ -104,7 +104,7 @@ async function createHubSpotDraft({ title, htmlBody }) {
 async function main() {
   const bundle = JSON.parse(fs.readFileSync(BUNDLE_PATH, 'utf-8'));
 
-  if (bundle.cases.length === 0 && bundle.callSummaries.length === 0) {
+  if (bundle.cases.length === 0) {
     console.log('No fresh activity this period — skipping Work Journal post.');
     return;
   }
@@ -113,11 +113,7 @@ async function main() {
   const styleReference = extractStyleReference(kbContent);
 
   const evidenceText = JSON.stringify(
-    {
-      cases: bundle.cases,
-      callSummaries: bundle.callSummaries,
-      agencyDocs: bundle.agencyDocs,
-    },
+    { cases: bundle.cases, agencyDocs: bundle.agencyDocs },
     null,
     2
   );

@@ -2,7 +2,7 @@
   "name": "scalematters-content-pipeline",
   "version": "1.0.0",
   "private": true,
-  "description": "Weekly automation: refreshes the widget's knowledge base and drafts the Work Journal blog post from live Salesforce/Gong/Drive data.",
+  "description": "Weekly automation: refreshes the widget's knowledge base and drafts the Work Journal blog post from live Salesforce and Drive data.",
   "type": "commonjs",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",

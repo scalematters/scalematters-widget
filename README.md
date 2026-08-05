@@ -146,7 +146,7 @@ never commit `.env.local`).
 
 ## V2: Automated Content Pipeline
 
-A weekly GitHub Action ([`.github/workflows/weekly-content-pipeline.yml`](.github/workflows/weekly-content-pipeline.yml)) pulls the last 7 days of Salesforce Cases, Gong call summaries, and two Google Drive folders, then:
+A weekly GitHub Action ([`.github/workflows/weekly-content-pipeline.yml`](.github/workflows/weekly-content-pipeline.yml)) pulls the last 7 days of Salesforce Cases (Gong call summaries are already synced into Salesforce, so there's no separate Gong connection) and two Google Drive folders, then:
 
 1. Opens a **pull request** with proposed updates to the Service Catalog sections of `knowledge_base.md` and `service_catalog.md` — never pushes to `main` directly. It only ever touches the evidence-driven category entries; the Tone/Rules/Pricing sections are structurally excluded and can't appear in the diff.
 2. Drafts the weekly **Work Journal** blog post in HubSpot — created as a **draft**, never published automatically. It also runs a safety check that aborts instead of creating the draft if a real customer/account name ends up in the generated text.
@@ -155,34 +155,37 @@ Both need a human to take the final step: merge the PR (which deploys automatica
 
 ### Setup
 
-All five credentials below get added as **GitHub repository secrets**: go to the repo on GitHub → **Settings → Secrets and variables → Actions → New repository secret**.
+All credentials below get added as **GitHub repository secrets**: go to the repo on GitHub → **Settings → Secrets and variables → Actions → New repository secret**.
 
 **1. Salesforce** (read-only access to Cases)
-1. In Salesforce Setup, search for **App Manager** → **New Connected App**.
-2. Enable OAuth Settings, and under OAuth flows enable the **Client Credentials Flow**.
-3. Set the "Run As" user to a read-only integration user (create one if you don't have one — it should only have access to the Case object).
+
+scaleMatters already has a read-only integration user set up (Vinny created it via his Claude account's Salesforce connection) — reuse that user rather than creating a new one, since it's already licensed.
+
+1. In Salesforce Setup, confirm that existing read-only user has access to the **Case** object (Vinny: "I can probably grant further object access to read data" — this is that step).
+2. Search Setup for **App Manager** → **New Connected App**.
+3. Enable OAuth Settings, and under OAuth flows enable the **Client Credentials Flow**, with the "Run As" user set to that same existing read-only user.
 4. Save, then find the app's **Consumer Key** and **Consumer Secret** under Manage Consumer Details.
 5. Add as secrets: `SF_CLIENT_ID` (Consumer Key), `SF_CLIENT_SECRET` (Consumer Secret), `SF_INSTANCE_URL` (your org's URL, e.g. `https://scalematters.my.salesforce.com`).
 
-**2. Gong** (read-only access to calls)
-1. In Gong, go to **Company Settings → Ecosystem → API**.
-2. Generate an Access Key / Access Key Secret pair.
-3. Add as secrets: `GONG_ACCESS_KEY`, `GONG_ACCESS_KEY_SECRET`.
+No separate Gong setup — Gong data already syncs into Salesforce, so it comes along with the Case data above.
 
-**3. Google Drive** (read-only access to two specific folders)
+**2. Google Drive** (read-only access to two specific folders)
+
+scaleMatters already manages Drive access via the `claude@scalematters.com` Google Group — reuse that instead of sharing folders one-by-one.
+
 1. In [Google Cloud Console](https://console.cloud.google.com), create a project (or use an existing one), enable the **Google Drive API**, and create a **Service Account**.
 2. Generate a JSON key for that service account and download it.
 3. Base64-encode it into one line: `base64 -i service-account.json | tr -d '\n'` — add the result as secret `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64`.
-4. In Google Drive, share the Customer SOWs folder and the founder-brand-agency folder with the service account's email (found inside the JSON key file, looks like `...@...iam.gserviceaccount.com`) — Viewer access is enough.
+4. Add the service account's email (found inside the JSON key file, looks like `...@...iam.gserviceaccount.com`) as a **member** of the `claude@scalematters.com` Google Group — it should then inherit access to whatever folders that group is already shared on. Confirm the Customer SOWs folder and the founder-brand-agency folder are actually shared with that group; if not, share them with the group directly (Viewer access is enough) rather than with the service account individually, to stay consistent with how the rest of Drive access is managed.
 5. Get each folder's ID from its URL (`drive.google.com/drive/folders/THIS_PART`) and add as secrets: `DRIVE_CUSTOMER_FOLDER_ID`, `DRIVE_AGENCY_FOLDER_ID`.
 
-**4. HubSpot** (draft-post access to the Work Journal blog)
+**3. HubSpot** (draft-post access to the Work Journal blog)
 1. In HubSpot, go to **Settings → Integrations → Private Apps → Create a private app**.
 2. Under Scopes, add blog/content read+write access (look for `content` or the CMS blog posts scope).
 3. Create the app and copy its access token — add as secret `HUBSPOT_PRIVATE_APP_TOKEN`.
 4. Find the Work Journal blog's ID: in HubSpot, open the Work Journal blog's settings — the ID is in the URL. Add as secret `HUBSPOT_BLOG_ID`.
 
-**5. Anthropic**
+**4. Anthropic**
 Add the same key already used in Vercel as secret `ANTHROPIC_API_KEY`.
 
 ### Testing without waiting a week

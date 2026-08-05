@@ -1,7 +1,8 @@
 // Refreshes only the evidence-driven sections of knowledge_base.md and
 // service_catalog.md — never the behavioral/tone sections — using the last
-// 7 days of Cases, Gong summaries, and Drive documents. Opens a PR instead
-// of touching main directly; a human reviews and merges it.
+// 7 days of closed Cases (which already include synced Gong call context)
+// and Drive documents. Opens a PR instead of touching main directly; a
+// human reviews and merges it.
 
 const fs = require('fs');
 const path = require('path');
@@ -22,9 +23,9 @@ const BUNDLE_PATH = path.join(__dirname, '.tmp', 'input-bundle.json');
 const SYSTEM_PROMPT = `You keep scaleMatters' AI chat widget's Service Catalog accurate and current.
 
 You'll be given the CURRENT content of a Service Catalog section, plus FRESH
-evidence from the last 7 days: newly closed support cases, sales/customer
-call summaries, and internal documents. Produce an UPDATED version of that
-section that:
+evidence from the last 7 days: newly closed support cases (which include
+synced Gong call context where relevant) and internal documents. Produce an
+UPDATED version of that section that:
 
 - Preserves the exact existing structure for each entry (category_key,
   ticket_volume, keywords, common_triggers, sample_user_phrases,
@@ -52,10 +53,6 @@ function summarizeBundle(bundle) {
     .map((c) => `- [${c.type || 'Case'}] ${c.subject}: ${c.description || '(no description)'}`)
     .join('\n');
 
-  const callLines = bundle.callSummaries
-    .map((c) => `- ${c.title || 'Call'}: ${c.brief || c.keyPoints?.join('; ') || '(no summary)'}`)
-    .join('\n');
-
   const agencyDocLines = bundle.agencyDocs
     .map((d) => `- ${d.name}${d.content ? `: ${d.content.slice(0, 2000)}` : ' (metadata only)'}`)
     .join('\n');
@@ -67,8 +64,6 @@ function summarizeBundle(bundle) {
   return [
     `## Newly closed cases (${bundle.cases.length})`,
     caseLines || '(none)',
-    `\n## Recent call summaries (${bundle.callSummaries.length})`,
-    callLines || '(none)',
     `\n## New/updated customer scoping documents (${bundle.customerDocs.length})`,
     customerDocLines || '(none)',
     `\n## New/updated founder-agency documents (${bundle.agencyDocs.length})`,
@@ -93,8 +88,8 @@ async function refreshSection({ filePath, startHeading, endHeading, evidenceText
 async function main() {
   const bundle = JSON.parse(fs.readFileSync(BUNDLE_PATH, 'utf-8'));
 
-  if (bundle.cases.length === 0 && bundle.callSummaries.length === 0) {
-    console.log('No fresh cases or calls this period — skipping knowledge base refresh.');
+  if (bundle.cases.length === 0) {
+    console.log('No fresh closed cases this period — skipping knowledge base refresh.');
     return;
   }
 
@@ -140,7 +135,6 @@ async function main() {
     body: [
       `Automated refresh based on the last ${bundle.sinceDays} days of activity:`,
       `- ${bundle.cases.length} closed cases`,
-      `- ${bundle.callSummaries.length} call summaries`,
       `- ${bundle.customerDocs.length} customer documents`,
       `- ${bundle.agencyDocs.length} founder-agency documents`,
       '',
