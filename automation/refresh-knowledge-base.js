@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { extractSection, spliceSection } = require('./lib/sections');
+const { extractSection, spliceSection, splitIntoChunks, joinChunks } = require('./lib/sections');
 const { synthesize } = require('./lib/anthropic');
 const { createBranchWithFileUpdates, openPullRequest } = require('./lib/github-pr');
 
@@ -71,18 +71,63 @@ function summarizeBundle(bundle) {
   ].join('\n');
 }
 
-async function refreshSection({ filePath, startHeading, endHeading, evidenceText }) {
+// The Service Catalog sections are far larger than the model's 16,000-token
+// output limit, so a single request to rewrite the whole thing risks a
+// truncated reply that silently drops content. Instead, split the section at
+// its per-category sub-headings and synthesize each category on its own —
+// small enough to finish well within the limit — and refuse to use any
+// individual reply that still comes back truncated (stop_reason
+// 'max_tokens'); that category is left unchanged and flagged for review
+// instead of risking cut-off content.
+async function refreshSection({ filePath, startHeading, endHeading, chunkHeadingRegex, label, evidenceText }) {
   const original = fs.readFileSync(filePath, 'utf-8');
   const { before, section, after } = extractSection(original, { startHeading, endHeading });
 
-  const updatedSection = await synthesize({
-    system: SYSTEM_PROMPT,
-    prompt: `CURRENT SECTION:\n\n${section}\n\n---\n\nFRESH EVIDENCE (last 7 days):\n\n${evidenceText}`,
-    maxTokens: 16000,
-  });
+  const { preambleLines, chunks } = splitIntoChunks(section, chunkHeadingRegex);
+  const truncationWarnings = [];
 
+  if (chunks.length === 0) {
+    // No per-category sub-heading found to split on — fall back to
+    // synthesizing the whole section in one request, but still refuse a
+    // truncated result rather than risk using cut-off content.
+    const { text, truncated } = await synthesize({
+      system: SYSTEM_PROMPT,
+      prompt: `CURRENT SECTION:\n\n${section}\n\n---\n\nFRESH EVIDENCE (last 7 days):\n\n${evidenceText}`,
+      maxTokens: 16000,
+    });
+
+    if (truncated) {
+      throw new Error(
+        `${label}: the model's reply was cut off (hit the output limit) and there was no ` +
+          'category heading to split the section on, so there is no safe smaller piece to retry. Skipping this run.'
+      );
+    }
+
+    const newFileContent = spliceSection({ before, updatedSection: text, after });
+    return { newFileContent, changed: newFileContent !== original, truncationWarnings };
+  }
+
+  const updatedChunks = [];
+  for (const chunk of chunks) {
+    const { text, truncated } = await synthesize({
+      system: SYSTEM_PROMPT,
+      prompt: `CURRENT SECTION:\n\n${chunk}\n\n---\n\nFRESH EVIDENCE (last 7 days):\n\n${evidenceText}`,
+      maxTokens: 16000,
+    });
+
+    if (truncated) {
+      const chunkHeading = chunk.split('\n')[0].trim();
+      truncationWarnings.push(`${label} — "${chunkHeading}": model reply was cut off; left unchanged, please review manually.`);
+      updatedChunks.push(chunk); // keep the original, unmodified, rather than use a possibly-incomplete reply
+      continue;
+    }
+
+    updatedChunks.push(text);
+  }
+
+  const updatedSection = joinChunks({ preambleLines, chunks: updatedChunks });
   const newFileContent = spliceSection({ before, updatedSection, after });
-  return { newFileContent, changed: newFileContent !== original };
+  return { newFileContent, changed: newFileContent !== original, truncationWarnings };
 }
 
 async function main() {
@@ -98,7 +143,9 @@ async function main() {
   const kbResult = await refreshSection({
     filePath: KB_PATH,
     startHeading: '## Knowledge Base: Service Catalog & Evidence',
-    endHeading: null,
+    endHeading: '## Technology We Support',
+    chunkHeadingRegex: /^### System: /,
+    label: 'knowledge_base.md',
     evidenceText,
   });
 
@@ -106,8 +153,12 @@ async function main() {
     filePath: CATALOG_PATH,
     startHeading: '## Salesforce (SFDC)',
     endHeading: '## Side-by-Side Competitor Comparison',
+    chunkHeadingRegex: /^## /,
+    label: 'service_catalog.md',
     evidenceText,
   });
+
+  const truncationWarnings = [...kbResult.truncationWarnings, ...catalogResult.truncationWarnings];
 
   if (!kbResult.changed && !catalogResult.changed) {
     console.log('Synthesis produced no material changes — skipping PR.');
@@ -143,6 +194,13 @@ async function main() {
       'Role and Purpose sections of knowledge_base.md are never sent to the',
       'model and cannot appear in this diff.',
       '',
+      ...(truncationWarnings.length > 0
+        ? [
+            '**Some categories could not be refreshed and were left unchanged:**',
+            ...truncationWarnings.map((w) => `- ${w}`),
+            '',
+          ]
+        : []),
       'Please review before merging — merging deploys automatically.',
     ].join('\n'),
   });

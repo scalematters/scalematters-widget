@@ -37,4 +37,37 @@ function spliceSection({ before, updatedSection, after }) {
   return parts.join('\n');
 }
 
-module.exports = { extractSection, spliceSection };
+// Splits a section further into sub-chunks at lines matching headingRegex, so
+// each chunk can be sent to the model (and checked for truncation) on its
+// own instead of as one oversized request. Content before the first matching
+// heading is returned separately as preambleLines and is never sent to the
+// model or treated as a chunk.
+function splitIntoChunks(sectionText, headingRegex) {
+  const lines = sectionText.split('\n');
+  const headingIndexes = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (headingRegex.test(lines[i])) headingIndexes.push(i);
+  }
+
+  if (headingIndexes.length === 0) {
+    return { preambleLines: lines, chunks: [] };
+  }
+
+  const preambleLines = lines.slice(0, headingIndexes[0]);
+  const chunks = headingIndexes.map((startIdx, i) => {
+    const endIdx = i + 1 < headingIndexes.length ? headingIndexes[i + 1] : lines.length;
+    return lines.slice(startIdx, endIdx).join('\n');
+  });
+
+  return { preambleLines, chunks };
+}
+
+// Inverse of splitIntoChunks: reassembles a section from its (possibly
+// updated) chunk strings plus the untouched preamble, preserving exact
+// original spacing.
+function joinChunks({ preambleLines, chunks }) {
+  const parts = preambleLines.length > 0 ? [preambleLines.join('\n'), ...chunks] : [...chunks];
+  return parts.join('\n');
+}
+
+module.exports = { extractSection, spliceSection, splitIntoChunks, joinChunks };
